@@ -12,10 +12,15 @@ public class Scraper {
 
     }
 
+    /**
+     * Retrieve an arrray of HTML link elements for a given url. Hard coded to process Bing results, and filter out irrelevant elements.
+     * @param url
+     * @return
+     */
     public Elements retrieveInitialSeedResults(String url) {
         try {
             Document document = Jsoup.connect(url).get();
-            document.select("a[href*=#]").remove();
+            //document.select("a[href*=#]").remove();
             document.select("a[id]").remove();
             document.select("a[href*=bat.bing.com]").remove();
             document.select("a[href*=choice.microsoft]").remove();

@@ -24,6 +24,10 @@ public class Crawler
         }
     }
 
+    /**
+     * Retrieve top 100 results from Bing for a user inputted query.
+     * @return set containg urls of the top 100 resutls of a search term.
+     */
     private static Set<String> initializeWebCrawlerSeed() {
         StringBuilder initialSeedUrl = new StringBuilder("https://www.bing.com/search?q=");
         Set<String> unique_links = new HashSet<String>();
