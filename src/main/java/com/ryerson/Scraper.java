@@ -8,8 +8,9 @@ import org.jsoup.select.Elements;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
+import java.util.concurrent.Callable;
 
-public class Scraper {
+public class Scraper implements Callable<Elements>{
 
     public String getBaseUrl() {
         return baseUrl;
@@ -25,6 +26,10 @@ public class Scraper {
     Scraper(String urlToParse, String[] query) {
         baseUrl = urlToParse;
         searchQuery = query;
+    }
+
+    public Elements call() throws Exception {
+        return processBaseUrlPage();
     }
 
     /**
@@ -56,7 +61,7 @@ public class Scraper {
         try {
             Document webpage = Jsoup.connect(baseUrl).get();
             // Store in DB
-            return filterEncountedUrls(webpage.select("a[href*=http]"));
+            return filterEncounterUrls(webpage.select("a[href*=http]"));
         } catch (Exception ex) {
             System.out.println("Error occurred when trying to parse wepage " + baseUrl+ " : " + ex);
             return null;
@@ -64,7 +69,7 @@ public class Scraper {
     }
 
     // Filter out irrelevant, and internally referring links.
-    private Elements filterEncountedUrls(Elements htmlLinks) {
+    private Elements filterEncounterUrls(Elements htmlLinks) {
         Iterator<Element> elementFinder = htmlLinks.iterator();
         while(elementFinder.hasNext()) {
             Element link = elementFinder.next();

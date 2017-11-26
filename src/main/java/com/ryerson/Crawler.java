@@ -6,8 +6,11 @@ import org.jsoup.select.Elements;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
-import java.util.TreeSet;
+import java.util.concurrent.*;
 
 /**
  * Hello world!
@@ -15,21 +18,40 @@ import java.util.TreeSet;
  */
 public class Crawler {
 
-    private static final int numberOfHosts = 300;
+    private static final int numberOfHosts = 50;
     private static final int maxiumCrawlDepth = 4;
-    private static final int maxiumumCrawledPages = 500;
+    private static final int maxiumumCrawledPages = 5000;
     private static String[] searchQuery;
+    private static ArrayBlockingQueue<String> crawlingQueue;
+    private static ConcurrentSkipListSet<String> visitedLinks = new ConcurrentSkipListSet<>();
 
 
-    public static void main( String[] args ) throws IOException {
-        Set<String> initialSeed = initializeWebCrawlerSeed();
-        for (String link : initialSeed) {
-            Scraper linkFollower = new Scraper(link, searchQuery);
-            Elements links = linkFollower.processBaseUrlPage();
-            for (Element elem : links) {
-                System.out.println("Link is " + elem.attr("href")+ " : " + elem.html());
+    public static void main( String[] args ) throws IOException, InterruptedException, ExecutionException {
+        crawlingQueue = new ArrayBlockingQueue<>(maxiumumCrawledPages, true, initializeWebCrawlerSeed());
+        ExecutorService pool = Executors.newFixedThreadPool(5);
+        List <Future<Elements>> threadLinks = new ArrayList<>();
+        while (!crawlingQueue.isEmpty()) {
+            String link = crawlingQueue.take();
+            if (visitedLinks.contains(link)) {
+                System.out.println("Dupe link, skip parse step");
+                continue;
             }
+            Future<Elements> futureLinks = pool.submit(new Scraper(link, searchQuery));
+            Elements links = futureLinks.get();
+            if (links != null) {
+                for (Element elem : links) {
+                    System.out.println("Link is " + elem.attr("href") + " : " + elem.html());
+                    if (isLinkAllowedToBeQueued(link)) {
+                        crawlingQueue.add(elem.html());
+                    } else System.out.println("Dupe link found, skip.");
+                }
+            }
+            visitedLinks.add(link);
         }
+    }
+
+    private static boolean isLinkAllowedToBeQueued(String link) {
+        return  !visitedLinks.contains(link) && (visitedLinks.size() < maxiumumCrawledPages);
     }
 
     /**
@@ -38,7 +60,7 @@ public class Crawler {
      */
     private static Set<String> initializeWebCrawlerSeed() {
         StringBuilder initialSeedUrl = new StringBuilder("https://www.bing.com/search?q=");
-        Set<String> unique_links = new TreeSet<String>();
+        Set<String> unique_links = new HashSet<>();
 
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         System.out.println("Please enter a search term to crawl the web for: ");
@@ -69,8 +91,5 @@ public class Crawler {
             return unique_links;
         }
     }
-
-
-
 
 }
