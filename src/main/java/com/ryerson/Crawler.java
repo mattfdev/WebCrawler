@@ -28,25 +28,26 @@ public class Crawler {
 
     public static void main( String[] args ) throws IOException, InterruptedException, ExecutionException {
         crawlingQueue = new ArrayBlockingQueue<>(maxiumumCrawledPages, true, initializeWebCrawlerSeed());
-        ExecutorService pool = Executors.newFixedThreadPool(5);
-        List <Future<Elements>> threadLinks = new ArrayList<>();
         while (!crawlingQueue.isEmpty()) {
             String link = crawlingQueue.take();
             if (visitedLinks.contains(link)) {
                 System.out.println("Dupe link, skip parse step");
                 continue;
             }
-            Future<Elements> futureLinks = pool.submit(new Scraper(link, searchQuery));
-            Elements links = futureLinks.get();
-            if (links != null) {
-                for (Element elem : links) {
-                    System.out.println("Link is " + elem.attr("href") + " : " + elem.html());
-                    if (isLinkAllowedToBeQueued(link)) {
-                        crawlingQueue.add(elem.html());
-                    } else System.out.println("Dupe link found, skip.");
-                }
-            }
+            CompletableFuture.supplyAsync(new Scraper(link, searchQuery)).thenAccept(a ->processLinks(a)).get();
             visitedLinks.add(link);
+        }
+    }
+
+    public static void processLinks(Elements links) {
+        if (links != null) {
+            for (Element elem : links) {
+                String link = elem.attr("href");
+                System.out.println("Link is " + link + " : " + elem.html());
+                if (isLinkAllowedToBeQueued(link)) {
+                    crawlingQueue.add(elem.html());
+                } else System.out.println("Dupe link found, skip.");
+            }
         }
     }
 

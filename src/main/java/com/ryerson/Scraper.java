@@ -9,8 +9,9 @@ import java.io.IOException;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.concurrent.Callable;
+import java.util.function.Supplier;
 
-public class Scraper implements Callable<Elements>{
+public class Scraper implements Supplier<Elements> {
 
     public String getBaseUrl() {
         return baseUrl;
@@ -28,7 +29,7 @@ public class Scraper implements Callable<Elements>{
         searchQuery = query;
     }
 
-    public Elements call() throws Exception {
+    public Elements get() {
         return processBaseUrlPage();
     }
 
