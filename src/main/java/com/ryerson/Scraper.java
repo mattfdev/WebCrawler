@@ -61,7 +61,7 @@ public class Scraper implements Supplier<Elements> {
     public Elements processBaseUrlPage() {
         try {
             Document webpage = Jsoup.connect(baseUrl).get();
-            // Store in DB
+            Crawler.documentStorage.put(baseUrl, webpage);
             return filterEncounterUrls(webpage.select("a[href*=http]"));
         } catch (Exception ex) {
             System.out.println("Error occurred when trying to parse wepage " + baseUrl+ " : " + ex);
