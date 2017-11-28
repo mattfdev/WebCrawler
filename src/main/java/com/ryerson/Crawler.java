@@ -20,15 +20,16 @@ public class Crawler {
 
     private static final int numberOfHosts = 50;
     private static final int maxiumCrawlDepth = 4;
-    private static final int maxiumumCrawledPages = 5000;
+    private static final int threadCount = 10;
+    private static final int maxiumumCrawledPages = 500;
     private static String[] searchQuery;
     private static ArrayBlockingQueue<String> crawlingQueue;
     private static ConcurrentSkipListSet<String> visitedLinks = new ConcurrentSkipListSet<>();
 
 
     public static void main( String[] args ) throws IOException, InterruptedException, ExecutionException {
-        crawlingQueue = new ArrayBlockingQueue<>(maxiumumCrawledPages, true, initializeWebCrawlerSeed());
-        while (!crawlingQueue.isEmpty()) {
+        crawlingQueue = new ArrayBlockingQueue<>(maxiumumCrawledPages * 10, true, initializeWebCrawlerSeed());
+        while (visitedLinks.size() < maxiumumCrawledPages && !crawlingQueue.isEmpty()) {
             String link = crawlingQueue.take();
             if (visitedLinks.contains(link)) {
                 System.out.println("Dupe link, skip parse step");
@@ -37,22 +38,26 @@ public class Crawler {
             CompletableFuture.supplyAsync(new Scraper(link, searchQuery)).thenAccept(a ->processLinks(a)).get();
             visitedLinks.add(link);
         }
+        System.out.println("Visited links are: ");
+        for (String link: visitedLinks) {
+            System.out.println(link);
+        }
     }
 
     public static void processLinks(Elements links) {
         if (links != null) {
             for (Element elem : links) {
                 String link = elem.attr("href");
-                System.out.println("Link is " + link + " : " + elem.html());
-                if (isLinkAllowedToBeQueued(link)) {
-                    crawlingQueue.add(elem.html());
+                if (isLinkAllowedToBeQueued(link, elem.html())) {
+                    System.out.println("Link is " + link + " : " + elem.html());
+                    crawlingQueue.add(link);
                 } else System.out.println("Dupe link found, skip.");
             }
         }
     }
 
-    private static boolean isLinkAllowedToBeQueued(String link) {
-        return  !visitedLinks.contains(link) && (visitedLinks.size() < maxiumumCrawledPages);
+    private static boolean isLinkAllowedToBeQueued(String link, String anchorText) {
+        return  !visitedLinks.contains(link) && (visitedLinks.size() < maxiumumCrawledPages) && !anchorText.contains("<");
     }
 
     /**
