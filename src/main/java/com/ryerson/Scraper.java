@@ -5,11 +5,18 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.concurrent.Callable;
+import java.io.InputStreamReader;
+import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URL;
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.function.Supplier;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Scraper implements Supplier<Elements> {
 
@@ -23,6 +30,9 @@ public class Scraper implements Supplier<Elements> {
 
     private final String[] searchQuery;
     private String baseUrl;
+    public static ConcurrentMap<String, Long> polite = new ConcurrentHashMap<>();
+    public static ConcurrentMap<String, List<URI>> robots = new ConcurrentHashMap<>();
+
 
     Scraper(String urlToParse, String[] query) {
         baseUrl = urlToParse;
@@ -60,6 +70,25 @@ public class Scraper implements Supplier<Elements> {
      */
     public Elements processBaseUrlPage() {
         try {
+            URL url = new URL(baseUrl);
+            String protocol = url.getProtocol();
+            String domain = url.getHost();
+            domain = domain.startsWith("www") ? domain : domain.substring(4);
+            saveRobotText(domain, protocol);
+            boolean shouldScrape = true;
+            for (URI bannedSub : robots.get(domain)) {
+                if (isBannedChild(bannedSub, url.toURI())){
+                    System.out.println("Dont scrape page of domain " + domain);
+                    shouldScrape = false;
+                    break;
+                }
+            }
+            if (!shouldScrape) return null;
+            if (polite.get(domain) != null && System.currentTimeMillis() -  polite.get(domain) < 500 ) {
+                Thread.sleep(500);
+            }
+            polite.replace(domain, System.currentTimeMillis());
+            polite.putIfAbsent(domain, System.currentTimeMillis());
             Document webpage = Jsoup.connect(baseUrl).get();
             Crawler.documentStorage.put(baseUrl, webpage);
             return filterEncounterUrls(webpage.select("a[href*=http]"));
@@ -67,6 +96,49 @@ public class Scraper implements Supplier<Elements> {
             System.out.println("Error occurred when trying to parse wepage " + baseUrl+ " : " + ex);
             return null;
         }
+    }
+
+    // Process a domains robot.txt
+    private void saveRobotText(String hostname, String protocol) {
+        if (robots.get(hostname) == null) {
+            String robotsText = protocol + "://" +  hostname + "/robots.txt";
+            try(BufferedReader in = new BufferedReader(
+                    new InputStreamReader(new URL(robotsText).openStream()))) {
+                System.out.println("Robot text found for " + hostname);
+                List<String> denied = new ArrayList<>();
+                String line;
+                final Pattern pattern = Pattern.compile("disallow:\\s*/(.*)");
+                Matcher matcher;
+                boolean robot_agent = false;
+                while (((line = in.readLine()) != null)) {
+                    line = line.toLowerCase();
+                    if (robot_agent && line.replaceAll("\\s+","").equals("user-agent:*"))
+                        break;
+
+                    matcher = pattern.matcher(line);
+                    if (matcher.find()) {
+                        denied.add(matcher.group(1));
+                    }
+
+                    if (line.matches("user-agent:\\s+\\*$")){
+                        robot_agent = true;
+                    }
+                }
+
+                List<URI> blockedPaths = new LinkedList<>();
+                for (String s: denied) blockedPaths.add(new URI(hostname + s));
+                //for (URI s : blockedPaths) System.out.println(s);
+                robots.putIfAbsent(hostname, blockedPaths);
+            } catch (Exception ex) {
+                robots.putIfAbsent(hostname, new ArrayList<>());
+            }
+        } else {
+            robots.putIfAbsent(hostname, new ArrayList<>());
+        }
+    }
+
+    private static boolean isBannedChild(URI banned, URI current){
+        return current.getPath().endsWith(banned.relativize(current).toString());
     }
 
     // Filter out irrelevant, and internally referring links.

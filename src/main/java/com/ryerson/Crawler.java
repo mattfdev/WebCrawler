@@ -1,10 +1,12 @@
 package com.ryerson;
 
+import com.sun.jndi.toolkit.url.Uri;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.*;
+import java.net.MalformedURLException;
 import java.util.*;
 import java.util.concurrent.*;
 
@@ -14,7 +16,6 @@ import java.util.concurrent.*;
  */
 public class Crawler {
 
-    private static final int numberOfHosts = 50;
     private static final int maxiumCrawlDepth = 4;
     private static final int threadCount = 10;
     private static final int maxiumumCrawledPages = 500;
@@ -64,14 +65,18 @@ public class Crawler {
     }
 
     private static void processLinks(Elements links) {
-        if (links != null) {
-            for (Element elem : links) {
-                String link = elem.attr("href");
-                if (isLinkAllowedToBeQueued(link, elem.html())) {
-                    //System.out.println("Link is " + link + " : " + elem.html());
-                    crawlingQueue.add(link);
-                } //else System.out.println("Dupe link found, skip.");
+        try {
+            if (links != null) {
+                for (Element elem : links) {
+                    String link = elem.attr("href");
+                    if (isLinkAllowedToBeQueued(link, elem.html())) {
+                        //System.out.println("Link is " + link + " : " + elem.html());
+                        crawlingQueue.add(link);
+                    } //else System.out.println("Dupe link found, skip.");
+                }
             }
+        } catch (Exception ex) {
+            System.out.println("Exception " + ex);
         }
     }
 
